@@ -14,7 +14,7 @@ import (
 
 type SitemapNode struct {
 	root  string
-	links []*SitemapNode
+	links []*SitemapNode // should be a set to avoid duplicates
 }
 
 type PageURLs struct {
@@ -35,21 +35,21 @@ func getLink(t html.Token) (string, error) {
 	return "", errors.New("Unable to find any href attribute")
 }
 
-// Given the root URL sends all the found URLs in the webpage through the given
+// Given the raw URL sends all the found URLs in the webpage through the given
 // channel.
-func parseUrl(rooturl string, chPage chan PageURLs) {
-	//fmt.Println("Crawling:", rooturl)
-	page := PageURLs{rooturl, nil}
+func parseUrl(rooturl string, rawurl string, chPage chan PageURLs) {
+	//fmt.Println("Crawling:", rawurl)
+	page := PageURLs{rawurl, nil}
 	// get the root URL raw path
 	absolute, err := url.Parse(rooturl)
 	if err != nil {
-		message := fmt.Sprintf("[%s] Unable to parse the URL: %s", err, rooturl)
+		message := fmt.Sprintf("[%s] Unable to parse the URL: %s", err, rawurl)
 		log.Println(message)
 		chPage <- page
 		return
 	}
 	rootPath := absolute.Path
-	resp, err := http.Get(rooturl)
+	resp, err := http.Get(rawurl)
 	// check for requests errors
 	if err != nil || resp.StatusCode != http.StatusOK {
 		// TODO: verbose logging
@@ -88,29 +88,32 @@ func parseUrl(rooturl string, chPage chan PageURLs) {
 }
 
 // Explore the site map without following external links.
-func crawl(rooturl string) {
-	// list of urls to visit and set of the onces already visited to avoid
-	// duplicates
+func crawl(rooturl string, maxDepth int) SitemapNode {
+	// list of urls to visit
 	toVisit := []string{rooturl}
-	visited := make(map[string]bool)
-	visited[rooturl] = true
-
 	// channel of visited urls with their content as urls list
 	chPage := make(chan PageURLs)
 
-	maxDepth := 0
-	// bread first search
+	// sitemap graph
+	rootNode := SitemapNode{rooturl, []*SitemapNode{}}
+	// map of visited nodes (link to the graph nodes and avoid visiting the same
+	// nodes during the breadth first search)
+	nodes := make(map[string]*SitemapNode)
+	nodes[rooturl] = &rootNode
+
+	depth := 0
+	// breadth first search
 	for len(toVisit) > 0 {
-		if maxDepth > 2 {
-			//break
+		if depth > maxDepth && maxDepth > 0 {
+			break
 		}
-		maxDepth++
+		depth++
 
 		// process in parallel all the current urls to visit
 		length := len(toVisit)
 		i := 0
 		for i < length {
-			go parseUrl(toVisit[i], chPage)
+			go parseUrl(rooturl, toVisit[i], chPage)
 			i++
 		}
 		toVisit = nil
@@ -119,22 +122,55 @@ func crawl(rooturl string) {
 		i = 0
 		for i < length {
 			page := <-chPage
+			if len(page.urls) == 0 {
+				i++
+				continue
+			}
+			// find root node
+			root := nodes[page.root]
 			// iterate over each URL found in the page
-			for _, u := range page.urls {
-				// check if already visited
-				if _, exists := visited[u]; !exists {
-					toVisit = append(toVisit, u)
-					visited[u] = true
+			for j := range page.urls {
+				url := &page.urls[j]
+				// if the link is not stored in the graph not create a new node
+				if _, exists := nodes[*url]; !exists {
+					nodes[*url] = &SitemapNode{*url, []*SitemapNode{}}
+					toVisit = append(toVisit, *url)
 				}
+				// link url to the root node
+				root.links = append(root.links, nodes[*url])
 			}
 			i++
 		}
 
-		fmt.Println("visited", len(visited))
+		fmt.Println("visited", len(nodes))
+	}
+
+	return rootNode
+}
+
+// Explore the sitemap graph with a breadth first search and prints it to the
+// standard output.
+func print(sitemap *SitemapNode) {
+	queue := []*SitemapNode{sitemap}
+	visited := make(map[string]bool)
+	// bfs
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		fmt.Println(node.root)
+		for _, link := range node.links {
+			fmt.Printf("\t%s\n", link.root)
+			if _, exists := visited[link.root]; !exists {
+				queue = append(queue, link)
+				visited[link.root] = true
+			}
+		}
 	}
 }
 
 func main() {
 	rooturl := "http://monzo.com/"
-	crawl(rooturl)
+	maxDepth := -1
+	sitemap := crawl(rooturl, maxDepth)
+	print(&sitemap)
 }
