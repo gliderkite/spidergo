@@ -14,7 +14,7 @@ import (
 
 type SitemapNode struct {
 	root  string
-	links []*SitemapNode // should be a set to avoid duplicates
+	links map[*SitemapNode]bool
 }
 
 type PageURLs struct {
@@ -95,7 +95,7 @@ func crawl(rooturl string, maxDepth int) SitemapNode {
 	chPage := make(chan PageURLs)
 
 	// sitemap graph
-	rootNode := SitemapNode{rooturl, []*SitemapNode{}}
+	rootNode := SitemapNode{rooturl, make(map[*SitemapNode]bool)}
 	// map of visited nodes (link to the graph nodes and avoid visiting the same
 	// nodes during the breadth first search)
 	nodes := make(map[string]*SitemapNode)
@@ -122,6 +122,7 @@ func crawl(rooturl string, maxDepth int) SitemapNode {
 		i = 0
 		for i < length {
 			page := <-chPage
+			// check if the page is valid
 			if len(page.urls) == 0 {
 				i++
 				continue
@@ -133,11 +134,11 @@ func crawl(rooturl string, maxDepth int) SitemapNode {
 				url := &page.urls[j]
 				// if the link is not stored in the graph not create a new node
 				if _, exists := nodes[*url]; !exists {
-					nodes[*url] = &SitemapNode{*url, []*SitemapNode{}}
+					nodes[*url] = &SitemapNode{*url, make(map[*SitemapNode]bool)}
 					toVisit = append(toVisit, *url)
 				}
 				// link url to the root node
-				root.links = append(root.links, nodes[*url])
+				root.links[nodes[*url]] = true
 			}
 			i++
 		}
@@ -158,7 +159,7 @@ func print(sitemap *SitemapNode) {
 		node := queue[0]
 		queue = queue[1:]
 		fmt.Println(node.root)
-		for _, link := range node.links {
+		for link := range node.links {
 			fmt.Printf("\t%s\n", link.root)
 			if _, exists := visited[link.root]; !exists {
 				queue = append(queue, link)
@@ -169,7 +170,7 @@ func print(sitemap *SitemapNode) {
 }
 
 func main() {
-	rooturl := "http://monzo.com/"
+	rooturl := "https://monzo.com/"
 	maxDepth := -1
 	sitemap := crawl(rooturl, maxDepth)
 	print(&sitemap)
