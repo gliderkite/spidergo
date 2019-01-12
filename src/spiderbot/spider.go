@@ -21,7 +21,7 @@ type SitemapNode struct {
 
 type pageURLs struct {
 	root string
-	urls []string
+	urls map[string]bool
 }
 
 // Spider Spiderbot user to crawl a domain.
@@ -78,8 +78,7 @@ func (s *Spider) parseURL(rawurl string, chPage chan pageURLs) {
 	b := resp.Body
 	defer b.Close()
 
-	// list of URLs found in the webpage
-	//var urls []string
+	page.urls = make(map[string]bool)
 	// parse the response body
 	z := html.NewTokenizer(b)
 	for {
@@ -98,11 +97,15 @@ func (s *Spider) parseURL(rawurl string, chPage chan pageURLs) {
 			}
 			// do not follow external links (or itself)
 			if !strings.HasPrefix(link, "/") || link == "/" {
-				continue
+				if !strings.HasPrefix(link, s.rooturl) {
+					continue
+				} else {
+					link = strings.Replace(link, s.rooturl, "", 1)
+				}
 			}
 			// store the absolute URL path
 			absolute.Path = path.Join(rootPath, link)
-			page.urls = append(page.urls, absolute.String())
+			page.urls[absolute.String()] = true
 		}
 	}
 }
@@ -153,15 +156,14 @@ func (s *Spider) Crawl() SitemapNode {
 			// find root node
 			root := nodes[page.root]
 			// iterate over each URL found in the page
-			for j := range page.urls {
-				url := &page.urls[j]
+			for url := range page.urls {
 				// if the link is not stored in the graph not create a new node
-				if _, exists := nodes[*url]; !exists {
-					nodes[*url] = &SitemapNode{*url, make(map[*SitemapNode]bool)}
-					toVisit = append(toVisit, *url)
+				if _, exists := nodes[url]; !exists {
+					nodes[url] = &SitemapNode{url, make(map[*SitemapNode]bool)}
+					toVisit = append(toVisit, url)
 				}
 				// link url to the root node
-				root.links[nodes[*url]] = true
+				root.links[nodes[url]] = true
 			}
 			i++
 		}
