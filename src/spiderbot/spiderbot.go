@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"net/url"
 )
 
 func main() {
@@ -13,14 +12,12 @@ func main() {
 	maxDepth := flag.Int("max-depth", -1, "Max exploration depth, neg for unlimited")
 	flag.Parse()
 
-	rawurl, err := url.Parse(*rooturl)
-	if err != nil {
-		log.Fatal("The URL provided is not valid!")
-	}
-
 	// create the spiderbot
-	log.Printf("Crawling %s\n", rawurl.String())
-	spider := MakeSpider(rawurl.String(), *timeout, *maxDepth)
+	log.Printf("Crawling %s\n", *rooturl)
+	spider, err := MakeSpider(*rooturl, *timeout, *maxDepth)
+	if err != nil {
+		log.Fatal("Unable to create the spiderbot")
+	}
 	sitemap := spider.Crawl()
 	log.Println("Crawling completed!")
 	sitemap.Print()

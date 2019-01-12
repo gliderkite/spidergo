@@ -33,12 +33,16 @@ type Spider struct {
 }
 
 // MakeSpider Creates a new Spider.
-func MakeSpider(rooturl string, timeout int, maxDepth int) *Spider {
+func MakeSpider(rawurl string, timeout int, maxDepth int) (*Spider, error) {
+	rooturl, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
 	// HTTP client with timeout (safe for concurrent use by multiple goroutines)
 	client := http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 	}
-	return &Spider{rooturl, &client, timeout, maxDepth}
+	return &Spider{rooturl.String(), &client, timeout, maxDepth}, nil
 }
 
 // Helper function to get the content of an href attribute from an HTML token.
@@ -111,7 +115,7 @@ func (s *Spider) parseURL(rawurl string, chPage chan pageURLs) {
 }
 
 // Crawl Explore the site map without following external links.
-func (s *Spider) Crawl() SitemapNode {
+func (s *Spider) Crawl() *SitemapNode {
 	// list of urls to visit
 	toVisit := []string{s.rooturl}
 	// channel of visited urls with their content as urls list
@@ -171,7 +175,7 @@ func (s *Spider) Crawl() SitemapNode {
 		log.Println("To visit", len(toVisit))
 	}
 
-	return rootNode
+	return &rootNode
 }
 
 // Print Explore the sitemap graph with a breadth first search and prints it to
