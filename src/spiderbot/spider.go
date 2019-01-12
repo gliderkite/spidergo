@@ -1,4 +1,4 @@
-package spiderbot
+package main
 
 import (
 	"errors"
