@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"golang.org/x/net/html"
 )
@@ -37,7 +38,7 @@ func getLink(t html.Token) (string, error) {
 
 // Given the raw URL sends all the found URLs in the webpage through the given
 // channel.
-func parseUrl(rooturl string, rawurl string, chPage chan PageURLs) {
+func parseUrl(client *http.Client, rooturl string, rawurl string, chPage chan PageURLs) {
 	//fmt.Println("Crawling:", rawurl)
 	page := PageURLs{rawurl, nil}
 	// get the root URL raw path
@@ -49,7 +50,7 @@ func parseUrl(rooturl string, rawurl string, chPage chan PageURLs) {
 		return
 	}
 	rootPath := absolute.Path
-	resp, err := http.Get(rawurl)
+	resp, err := client.Get(rawurl)
 	// check for requests errors
 	if err != nil || resp.StatusCode != http.StatusOK {
 		// TODO: verbose logging
@@ -88,7 +89,7 @@ func parseUrl(rooturl string, rawurl string, chPage chan PageURLs) {
 }
 
 // Explore the site map without following external links.
-func crawl(rooturl string, maxDepth int) SitemapNode {
+func crawl(rooturl string, timeout int, maxDepth int) SitemapNode {
 	// list of urls to visit
 	toVisit := []string{rooturl}
 	// channel of visited urls with their content as urls list
@@ -101,8 +102,13 @@ func crawl(rooturl string, maxDepth int) SitemapNode {
 	nodes := make(map[string]*SitemapNode)
 	nodes[rooturl] = &rootNode
 
+	// HTTP client with timeout (safe for concurrent use by multiple goroutines)
+	client := http.Client{
+		Timeout: time.Duration(timeout) * time.Second,
+	}
+
 	depth := 0
-	// breadth first search
+	// modified version of breadth first search
 	for len(toVisit) > 0 {
 		if depth > maxDepth && maxDepth > 0 {
 			break
@@ -111,14 +117,16 @@ func crawl(rooturl string, maxDepth int) SitemapNode {
 
 		// process in parallel all the current urls to visit
 		length := len(toVisit)
+		fmt.Printf("Going to visit %d URLs\n", length)
 		i := 0
 		for i < length {
-			go parseUrl(rooturl, toVisit[i], chPage)
+			go parseUrl(&client, rooturl, toVisit[i], chPage)
 			i++
 		}
-		toVisit = nil
+		toVisit = toVisit[:0]
 
 		// get results from all the goroutines
+		fmt.Println("Waiting for results...")
 		i = 0
 		for i < length {
 			page := <-chPage
@@ -142,8 +150,8 @@ func crawl(rooturl string, maxDepth int) SitemapNode {
 			}
 			i++
 		}
-
-		fmt.Println("visited", len(nodes))
+		fmt.Println("Visited", len(nodes))
+		fmt.Println("To visit", len(toVisit))
 	}
 
 	return rootNode
@@ -160,7 +168,7 @@ func print(sitemap *SitemapNode) {
 		queue = queue[1:]
 		fmt.Println(node.root)
 		for link := range node.links {
-			fmt.Printf("\t%s\n", link.root)
+			//fmt.Printf("\t%s\n", link.root)
 			if _, exists := visited[link.root]; !exists {
 				queue = append(queue, link)
 				visited[link.root] = true
@@ -170,8 +178,11 @@ func print(sitemap *SitemapNode) {
 }
 
 func main() {
-	rooturl := "https://monzo.com/"
+	rooturl := "https://spotify.com/"
+	timeout := 5
 	maxDepth := -1
-	sitemap := crawl(rooturl, maxDepth)
-	print(&sitemap)
+	crawl(rooturl, timeout, maxDepth)
+	//sitemap := crawl(rooturl, maxDepth)
+	fmt.Println("Crawling completed!")
+	//print(&sitemap)
 }
