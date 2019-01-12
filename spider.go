@@ -23,8 +23,25 @@ type PageURLs struct {
 	urls []string
 }
 
+// Spider Spiderbot user to crawl a domain.
+type Spider struct {
+	rooturl  string
+	client   *http.Client
+	timeout  int
+	maxDepth int
+}
+
+// Creates a new Spider.
+func makeSpider(rooturl string, timeout int, maxDepth int) *Spider {
+	// HTTP client with timeout (safe for concurrent use by multiple goroutines)
+	client := http.Client{
+		Timeout: time.Duration(timeout) * time.Second,
+	}
+	return &Spider{rooturl, &client, timeout, maxDepth}
+}
+
 // Helper function to get the content of an href attribute from an HTML token.
-func getLink(t html.Token) (string, error) {
+func getLink(t *html.Token) (string, error) {
 	if t.Data != "a" {
 		return "", errors.New("The given token is not a valid anchor")
 	}
@@ -38,11 +55,11 @@ func getLink(t html.Token) (string, error) {
 
 // Given the raw URL sends all the found URLs in the webpage through the given
 // channel.
-func parseUrl(client *http.Client, rooturl string, rawurl string, chPage chan PageURLs) {
+func (s *Spider) parseURL(rawurl string, chPage chan PageURLs) {
 	//fmt.Println("Crawling:", rawurl)
 	page := PageURLs{rawurl, nil}
 	// get the root URL raw path
-	absolute, err := url.Parse(rooturl)
+	absolute, err := url.Parse(s.rooturl)
 	if err != nil {
 		message := fmt.Sprintf("[%s] Unable to parse the URL: %s", err, rawurl)
 		log.Println(message)
@@ -50,7 +67,7 @@ func parseUrl(client *http.Client, rooturl string, rawurl string, chPage chan Pa
 		return
 	}
 	rootPath := absolute.Path
-	resp, err := client.Get(rawurl)
+	resp, err := s.client.Get(rawurl)
 	// check for requests errors
 	if err != nil || resp.StatusCode != http.StatusOK {
 		// TODO: verbose logging
@@ -72,7 +89,8 @@ func parseUrl(client *http.Client, rooturl string, rawurl string, chPage chan Pa
 			chPage <- page
 			return
 		case tt == html.StartTagToken:
-			link, err := getLink(z.Token())
+			token := z.Token()
+			link, err := getLink(&token)
 			if err != nil {
 				// TODO: verbose logging
 				continue
@@ -89,28 +107,24 @@ func parseUrl(client *http.Client, rooturl string, rawurl string, chPage chan Pa
 }
 
 // Explore the site map without following external links.
-func crawl(rooturl string, timeout int, maxDepth int) SitemapNode {
+func (s *Spider) crawl() SitemapNode {
 	// list of urls to visit
-	toVisit := []string{rooturl}
+	toVisit := []string{s.rooturl}
 	// channel of visited urls with their content as urls list
 	chPage := make(chan PageURLs)
 
 	// sitemap graph
-	rootNode := SitemapNode{rooturl, make(map[*SitemapNode]bool)}
+	rootNode := SitemapNode{s.rooturl, make(map[*SitemapNode]bool)}
 	// map of visited nodes (link to the graph nodes and avoid visiting the same
 	// nodes during the breadth first search)
 	nodes := make(map[string]*SitemapNode)
-	nodes[rooturl] = &rootNode
-
-	// HTTP client with timeout (safe for concurrent use by multiple goroutines)
-	client := http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
-	}
+	nodes[s.rooturl] = &rootNode
 
 	depth := 0
 	// modified version of breadth first search
 	for len(toVisit) > 0 {
-		if depth > maxDepth && maxDepth > 0 {
+		// ensure a maximum "recursion" limit
+		if depth > s.maxDepth && s.maxDepth > 0 {
 			break
 		}
 		depth++
@@ -120,7 +134,7 @@ func crawl(rooturl string, timeout int, maxDepth int) SitemapNode {
 		fmt.Printf("Going to visit %d URLs\n", length)
 		i := 0
 		for i < length {
-			go parseUrl(&client, rooturl, toVisit[i], chPage)
+			go s.parseURL(toVisit[i], chPage)
 			i++
 		}
 		toVisit = toVisit[:0]
@@ -178,10 +192,13 @@ func print(sitemap *SitemapNode) {
 }
 
 func main() {
-	rooturl := "https://spotify.com/"
+	rooturl := "http://spotify.com"
 	timeout := 5
 	maxDepth := -1
-	crawl(rooturl, timeout, maxDepth)
+
+	// create the spiderbot
+	spider := makeSpider(rooturl, timeout, maxDepth)
+	spider.crawl()
 	//sitemap := crawl(rooturl, maxDepth)
 	fmt.Println("Crawling completed!")
 	//print(&sitemap)
