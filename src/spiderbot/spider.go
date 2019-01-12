@@ -1,4 +1,4 @@
-package main
+package spiderbot
 
 import (
 	"errors"
@@ -13,12 +13,13 @@ import (
 	"golang.org/x/net/html"
 )
 
+// SitemapNode Node of the graph that represents the sitemap
 type SitemapNode struct {
 	root  string
 	links map[*SitemapNode]bool
 }
 
-type PageURLs struct {
+type pageURLs struct {
 	root string
 	urls []string
 }
@@ -31,8 +32,8 @@ type Spider struct {
 	maxDepth int
 }
 
-// Creates a new Spider.
-func makeSpider(rooturl string, timeout int, maxDepth int) *Spider {
+// MakeSpider Creates a new Spider.
+func MakeSpider(rooturl string, timeout int, maxDepth int) *Spider {
 	// HTTP client with timeout (safe for concurrent use by multiple goroutines)
 	client := http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
@@ -55,9 +56,9 @@ func getLink(t *html.Token) (string, error) {
 
 // Given the raw URL sends all the found URLs in the webpage through the given
 // channel.
-func (s *Spider) parseURL(rawurl string, chPage chan PageURLs) {
-	//fmt.Println("Crawling:", rawurl)
-	page := PageURLs{rawurl, nil}
+func (s *Spider) parseURL(rawurl string, chPage chan pageURLs) {
+	//log.Println("Crawling:", rawurl)
+	page := pageURLs{rawurl, nil}
 	// get the root URL raw path
 	absolute, err := url.Parse(s.rooturl)
 	if err != nil {
@@ -106,12 +107,12 @@ func (s *Spider) parseURL(rawurl string, chPage chan PageURLs) {
 	}
 }
 
-// Explore the site map without following external links.
-func (s *Spider) crawl() SitemapNode {
+// Crawl Explore the site map without following external links.
+func (s *Spider) Crawl() SitemapNode {
 	// list of urls to visit
 	toVisit := []string{s.rooturl}
 	// channel of visited urls with their content as urls list
-	chPage := make(chan PageURLs)
+	chPage := make(chan pageURLs)
 
 	// sitemap graph
 	rootNode := SitemapNode{s.rooturl, make(map[*SitemapNode]bool)}
@@ -131,7 +132,7 @@ func (s *Spider) crawl() SitemapNode {
 
 		// process in parallel all the current urls to visit
 		length := len(toVisit)
-		fmt.Printf("Going to visit %d URLs\n", length)
+		log.Printf("Going to visit %d URLs\n", length)
 		i := 0
 		for i < length {
 			go s.parseURL(toVisit[i], chPage)
@@ -140,7 +141,7 @@ func (s *Spider) crawl() SitemapNode {
 		toVisit = toVisit[:0]
 
 		// get results from all the goroutines
-		fmt.Println("Waiting for results...")
+		log.Println("Waiting for results...")
 		i = 0
 		for i < length {
 			page := <-chPage
@@ -164,42 +165,29 @@ func (s *Spider) crawl() SitemapNode {
 			}
 			i++
 		}
-		fmt.Println("Visited", len(nodes))
-		fmt.Println("To visit", len(toVisit))
+		log.Println("Visited", len(nodes))
+		log.Println("To visit", len(toVisit))
 	}
 
 	return rootNode
 }
 
-// Explore the sitemap graph with a breadth first search and prints it to the
-// standard output.
-func print(sitemap *SitemapNode) {
+// Print Explore the sitemap graph with a breadth first search and prints it to
+// the standard output.
+func (sitemap *SitemapNode) Print() {
 	queue := []*SitemapNode{sitemap}
 	visited := make(map[string]bool)
 	// bfs
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-		fmt.Println(node.root)
+		log.Println(node.root)
 		for link := range node.links {
-			//fmt.Printf("\t%s\n", link.root)
+			log.Printf("\t%s\n", link.root)
 			if _, exists := visited[link.root]; !exists {
 				queue = append(queue, link)
 				visited[link.root] = true
 			}
 		}
 	}
-}
-
-func main() {
-	rooturl := "http://spotify.com"
-	timeout := 5
-	maxDepth := -1
-
-	// create the spiderbot
-	spider := makeSpider(rooturl, timeout, maxDepth)
-	spider.crawl()
-	//sitemap := crawl(rooturl, maxDepth)
-	fmt.Println("Crawling completed!")
-	//print(&sitemap)
 }
