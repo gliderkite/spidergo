@@ -187,9 +187,9 @@ func (sitemap *SitemapNode) Print() {
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-		log.Println(node.root)
+		fmt.Println(node.root)
 		for link := range node.links {
-			log.Printf("\t%s\n", link.root)
+			fmt.Printf("\t%s\n", link.root)
 			if _, exists := visited[link.root]; !exists {
 				queue = append(queue, link)
 				visited[link.root] = true
