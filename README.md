@@ -1,7 +1,5 @@
 # SpiderGo
 
-*Disclaimer: this is the first program I wrote in Go.*
-
 The goal of this project is to provide a simple implementation of a web crawler
 (spiderbot), which will be limited to a single domain (without following
 external links).
