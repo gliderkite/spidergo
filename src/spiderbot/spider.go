@@ -60,7 +60,7 @@ func getLink(t *html.Token) (string, error) {
 
 // Given the raw URL sends all the found URLs in the webpage through the given
 // channel.
-func (s *Spider) parseURL(rawurl string, chPage chan pageURLs) {
+func (s *Spider) parseURL(rawurl string, chPage chan<- pageURLs) {
 	//log.Println("Crawling:", rawurl)
 	page := pageURLs{rawurl, nil}
 	// get the root URL raw path
