@@ -24,7 +24,10 @@ The command line arguments that can be provided are:
 - URL (optional): the URL (*seed*) to crawl (default: https://monzo.com/)
 - Timeout (optional): the timeout for the HTTP requests (default: 5s)
 - Max depth (optional): maximum depth used for the exploration of the sitemap.
-    (default: unlimited) 
+    (default: unlimited)
+
+Disclaimer: This web crawler does not yet comply to the [robots exclusion
+standard](https://en.wikipedia.org/wiki/Robots_exclusion_standard).
 
 
 ## Requirements
