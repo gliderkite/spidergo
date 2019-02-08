@@ -30,10 +30,11 @@ type Spider struct {
 	client   *http.Client
 	timeout  int
 	maxDepth int
+	maxUrls  int
 }
 
 // MakeSpider Creates a new Spider.
-func MakeSpider(rawurl string, timeout int, maxDepth int) (*Spider, error) {
+func MakeSpider(rawurl string, timeout int, maxDepth int, maxUrls int) (*Spider, error) {
 	rooturl, err := url.Parse(rawurl)
 	if err != nil {
 		return nil, err
@@ -42,7 +43,7 @@ func MakeSpider(rawurl string, timeout int, maxDepth int) (*Spider, error) {
 	client := http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 	}
-	return &Spider{rooturl.String(), &client, timeout, maxDepth}, nil
+	return &Spider{rooturl.String(), &client, timeout, maxDepth, maxUrls}, nil
 }
 
 // Helper function to get the content of an href attribute from an HTML token.
@@ -137,15 +138,23 @@ func (s *Spider) Crawl() *SitemapNode {
 		}
 		depth++
 
-		// process in parallel all the current urls to visit
 		length := len(toVisit)
+		if s.maxUrls > 0 {
+			if len(toVisit) < s.maxUrls {
+				length = len(toVisit)
+			} else {
+				length = s.maxUrls
+			}
+		}
+
+		// process in parallel all the current urls to visit
 		log.Printf("Going to visit %d URLs\n", length)
 		i := 0
 		for i < length {
 			go s.parseURL(toVisit[i], chPage)
 			i++
 		}
-		toVisit = toVisit[:0]
+		toVisit = toVisit[i:]
 
 		// get results from all the goroutines
 		log.Println("Waiting for results...")

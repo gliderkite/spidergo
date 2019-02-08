@@ -6,10 +6,11 @@ import (
 
 // Tests that a spiderbot can be constructed with valid arguments.
 func TestShouldConstructSpider(t *testing.T) {
-	rooturl := "https://monzo.com/"
+	rooturl := "https://google.com/"
 	timeout := 5
 	maxDepth := 10
-	spider, err := MakeSpider(rooturl, timeout, maxDepth)
+	maxUrls := 100
+	spider, err := MakeSpider(rooturl, timeout, maxDepth, maxUrls)
 
 	if err != nil {
 		t.Error("Unable to construct a new spiderbot")
@@ -20,14 +21,14 @@ func TestShouldConstructSpider(t *testing.T) {
 
 // Tests that the spiderbot can correctly parse a given URL.
 func TestShouldParseURL(t *testing.T) {
-	rooturl := "https://monzo.com/"
-	spider, err := MakeSpider(rooturl, 1, 1)
+	rooturl := "https://google.com/"
+	spider, err := MakeSpider(rooturl, 1, 1, 50)
 	if err != nil {
 		t.Error("Unable to construct a new spiderbot")
 	}
 
 	chPage := make(chan pageURLs)
-	rawurl := rooturl + "about"
+	rawurl := rooturl + "services"
 	go spider.parseURL(rawurl, chPage)
 	page := <-chPage
 
@@ -39,7 +40,7 @@ func TestShouldParseURL(t *testing.T) {
 // Tests that the spiderbot can correctly crawl a given URL.
 func TestShouldCrawl(t *testing.T) {
 	rooturl := "https://google.com/"
-	spider, err := MakeSpider(rooturl, 1, 1)
+	spider, err := MakeSpider(rooturl, 1, 1, 50)
 	if err != nil {
 		t.Error("Unable to construct a new spiderbot")
 	}

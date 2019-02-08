@@ -19,7 +19,7 @@ constructing a new instance of the web crawler with the configuration provided,
 and finally crawling the given URL.
 
 The command line arguments that can be provided are:
-- URL (optional): the URL (*seed*) to crawl (default: https://monzo.com/)
+- URL (optional): the URL (*seed*) to crawl (default: https://google.com/)
 - Timeout (optional): the timeout for the HTTP requests (default: 5s)
 - Max depth (optional): maximum depth used for the exploration of the sitemap.
     (default: unlimited)
