@@ -21,7 +21,8 @@ and finally crawling the given URL.
 The command line arguments that can be provided are:
 - URL (optional): the URL (*seed*) to crawl (default: https://google.com/)
 - Timeout (optional): the timeout for the HTTP requests (default: 5s)
-- Max depth (optional): maximum depth used for the exploration of the sitemap.
+- Max URLs (optional): maximum number of URLs to visit per step (default: unlimited)
+- Max depth (optional): maximum depth used for the exploration of the sitemap
     (default: unlimited)
 
 Disclaimer: This web crawler does not yet comply to the [robots exclusion
@@ -53,7 +54,7 @@ Once the executable has been generated, it is possible to run the web crawler
 can be specified as, for example:
 
 ```bash
-./spiderbot -url=http://spotify.com -timeout=2 -max-depth=3
+./spiderbot -url=http://spotify.com -timeout=2 -max-depth=3 -max-urls=100
 ```
 
 In order to run the unit test, simply run `make test`.
